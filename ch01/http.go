@@ -25,10 +25,10 @@ func parse_url(uri (*string)) (string, string, error) {
 
 	pos2 := strings.Index((*uri)[pos1 + 2:], "/")
 	if -1 == pos2 {
-		return (*uri)[pos1 + 2:], "", nil
+		return (*uri)[pos1 + 2:], "/", nil
 	}
 	pos2 += pos1 + 2
-	return (*uri)[pos1 + 2 : pos2], (*uri)[pos2  + 1:], nil
+	return (*uri)[pos1 + 2 : pos2], (*uri)[pos2:], nil
 }
 
 /**
