@@ -7,15 +7,13 @@ import (
 	"net"
 	"fmt"
 	"strings"
+	"strconv"
 	"errors"
+	"./base64"
 )
 
 const HTTP_PORT = 80
 const BUFFER_SIZE = 255
-
-func parse_proxy_param(proxy_spec (*string)) (string, int, string, string, error) {
-	return "", 0, "", "", nil
-}
 
 func parse_url(uri (*string)) (string, string, error) {
 	pos1 := strings.Index(*uri, "//")
@@ -29,6 +27,43 @@ func parse_url(uri (*string)) (string, string, error) {
 	}
 	pos2 += pos1 + 2
 	return (*uri)[pos1 + 2 : pos2], (*uri)[pos2:], nil
+}
+
+func parse_proxy_param(proxy_spec (*string)) (string, int, string, string, error) {
+	if (*proxy_spec)[:7] != "http://" {
+		return "", 0, "", "", errors.New("invalid proxy spec")
+	}
+	login_sep := strings.Index((*proxy_spec)[:], "@")
+
+	colon_sep := 6
+	var proxy_user string
+	var proxy_password string
+	if login_sep != -1 {
+		colon_sep = strings.Index((*proxy_spec)[7:], ":")
+		if colon_sep == -1 {
+			return "", 0, "", "", errors.New("Expected password in " + (*proxy_spec))
+		}
+		proxy_user = (*proxy_spec)[7 : 7 + colon_sep]
+		proxy_password = (*proxy_spec)[colon_sep + 8 : login_sep]
+	}
+
+	proxy_port := HTTP_PORT
+	var proxy_host string
+
+	trailer_sep := strings.Index((*proxy_spec)[login_sep + 1:], "/")
+	if trailer_sep == -1 {
+		proxy_host = (*proxy_spec)[login_sep + 1 :]
+	} else {
+		proxy_host = (*proxy_spec)[login_sep + 1 : trailer_sep]
+	}
+
+	colon_sep = strings.Index(proxy_host, ":")
+	if colon_sep != -1 {
+		proxy_port, _ = strconv.Atoi(proxy_host[colon_sep + 1:])
+		proxy_host = proxy_host[:colon_sep]
+	}
+
+	return proxy_host, proxy_port, proxy_user, proxy_password, nil
 }
 
 /**
@@ -56,8 +91,13 @@ func http_get(connection int, path string, host string, proxy_host string, proxy
 		return err
 	}
 
-	if proxy_host != "" {
-
+	if proxy_user != "" {
+		auth_string, err := base64.Encode([]byte(proxy_user + ":" + proxy_password))
+		get_command = "Proxy-Authorization: BASIC " + string(auth_string) + "\r\n"
+		_, err = syscall.Write(connection, []byte(get_command))
+		if err != nil {
+			return err
+		}
 	}
 
 	get_command = "Connection: close\r\n\r\n"
@@ -96,19 +136,22 @@ func main() {
 		p = flag.String("p", "", "proxy")
 	)
 	flag.Parse()
+	args := flag.Args()
 
-	if (len(os.Args) < 2) {
+	if (len(args) < 1) {
 		fmt.Fprintf(os.Stderr, "Usage: %s: [-p http://[username:password@]proxy-host:proxy-port] <URL>\n", os.Args[0])
 		os.Exit(1)
 	}
 
 	proxy_host, proxy_port, proxy_user, proxy_password, err := parse_proxy_param(p)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error - malformed proxy parameter '%s'.\n", p)
+		fmt.Fprintf(os.Stderr, "Error - malformed proxy parameter '%s'.\n", *p)
 		os.Exit(2)
 	}
 
-	host, path, err := parse_url(&os.Args[1])
+	fmt.Printf("proxy_host, proxy_port, proxy_user, proxy_password = %s, %d, %s, %s\n", proxy_host, proxy_port, proxy_user, proxy_password)
+
+	host, path, err := parse_url(&args[0])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error - malformed URL '%s'.\n", os.Args[1])
 		os.Exit(1)
