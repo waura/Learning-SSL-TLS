@@ -11,7 +11,7 @@ func Encode(input []byte) ([]byte, error) {
 	len := len(input)
 
 	idx := 0
-	for ; len > 0; {
+	for len > 0 {
 		output = append(output, base64[(input[idx + 0] & 0xFC) >> 2])
 
 		if len == 1 {

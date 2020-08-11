@@ -2,14 +2,13 @@ all: http webserver
 
 OPTS =
 
-http: http.go base64.c base64.h
-	go build -o http $(OPTS) http.go base64.c
+http: http.go base64/base64.go
+	go build -o http $(OPTS) http.go
 
-webserver: webserver.c
-	gcc -o webserver $(OPTS) webserver.c
+webserver: webserver.go
+	go build -o webserver $(OPTS) webserver.go
 
 clean:
 	rm -f http
 	rm -f webserver
-	rm -f core
-	rm -f core.*
+
